@@ -1,0 +1,23 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Config files with secrets
+config.json
+session_tokens.json
+*.pem
+*.der

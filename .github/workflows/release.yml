@@ -1,0 +1,152 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'acvp-cli-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.6.7)'
+        required: true
+        default: 'v1.6.7'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-release:
+    name: Build Release - ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: acvp-cli
+            asset_name: acvp-cli-linux-x86_64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: acvp-cli
+            asset_name: acvp-cli-linux-x86_64-musl
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: acvp-cli
+            asset_name: acvp-cli-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: acvp-cli
+            asset_name: acvp-cli-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: acvp-cli.exe
+            asset_name: acvp-cli-windows-x86_64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install musl tools (Linux musl only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
+      - run: cargo build --release --target ${{ matrix.target }}
+      - name: Strip binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+      - name: Create checksum
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          sha256sum ${{ matrix.artifact_name }} > ${{ matrix.asset_name }}.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}.sha256
+          path: target/${{ matrix.target }}/release/${{ matrix.asset_name }}.sha256
+
+  create-release:
+    name: Create Release
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+      - name: Display structure
+        run: ls -R ./artifacts
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "artifacts/**/*"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          generateReleaseNotes: true
+          body: |
+            ## acvp-cli Release ${{ github.ref_name }}
+
+            ### Downloads
+
+            Choose the appropriate binary for your platform:
+
+            - **Linux (glibc)**: `acvp-cli-linux-x86_64`
+            - **Linux (musl)**: `acvp-cli-linux-x86_64-musl` (static, no dependencies)
+            - **macOS (Intel)**: `acvp-cli-macos-x86_64`
+            - **macOS (Apple Silicon)**: `acvp-cli-macos-aarch64`
+            - **Windows**: `acvp-cli-windows-x86_64.exe`
+
+            ### Verification
+
+            Verify your download with the provided SHA256 checksums:
+            ```bash
+            sha256sum -c acvp-cli-linux-x86_64.sha256
+            ```
+
+            ### Installation
+
+            Linux/macOS:
+            ```bash
+            chmod +x acvp-cli-*
+            sudo mv acvp-cli-* /usr/local/bin/acvp-cli
+            ```
+
+  docker-build:
+    name: Build Docker Image
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: acvp-cli-linux-x86_64-musl
+          path: ./docker
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image
+        run: |
+          cd docker
+          chmod +x acvp-cli
+          docker build -t acvp-cli:${{ github.ref_name }} -f ../Dockerfile .
+          docker tag acvp-cli:${{ github.ref_name }} acvp-cli:latest
+      - name: Save Docker image
+        run: docker save acvp-cli:${{ github.ref_name }} | gzip > acvp-cli-docker-${{ github.ref_name }}.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: acvp-cli-docker-${{ github.ref_name }}.tar.gz

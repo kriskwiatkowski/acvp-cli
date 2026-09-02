@@ -1,0 +1,8 @@
+{
+  "certPEMFile": "cert.pem",
+  "privateKeyDERFile": "key.der",
+  "totpSecret": "BASE64_ENCODED_SECRET",
+  "acvpServer": "https://demo.acvts.nist.gov/",
+  "sessionTokensCache": "session_tokens.json",
+  "logFile": "acvp.log"
+}

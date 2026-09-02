@@ -1,0 +1,23 @@
+[book]
+title = "acvp-cli Documentation"
+authors = ["Krzysztof Kwiatkowski"]
+language = "en"
+src = "src"
+
+[preprocessor.links]
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "navy"
+git-repository-url = "https://git.amongbytes.com/AmongBytes/acvp-cli"
+edit-url-template = "https://git.amongbytes.com/AmongBytes/acvp-cli/edit/main/docs/{path}"
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.playground]
+editable = false
+
+[output.html.search]
+enable = true
