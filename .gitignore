@@ -2,6 +2,9 @@
 /target/
 Cargo.lock
 
+# Generated book
+docs/book
+
 # IDE
 .vscode/
 .idea/

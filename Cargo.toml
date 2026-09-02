@@ -10,6 +10,7 @@ homepage = "https://git.amongbytes.com/AmongBytes/acvp-cli"
 
 
 [dependencies]
+hqc = { package = "hqckem-ref", version = "0.0.2" }
 mlkem-ref = { path = "../mlkem-ref" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -23,6 +24,7 @@ reqwest = { version = "0.12", features = [
 ], default-features = false }
 base64 = "0.22"
 hex = "0.4"
+sha3 = "0.10"
 sha2 = "0.10"
 hmac = "0.12"
 totp-lite = "2.0"
@@ -38,6 +40,10 @@ path = "src/main.rs"
 [[bin]]
 name = "mlkem_wrapper"
 path = "src/bin/mlkem_wrapper.rs"
+
+[[bin]]
+name = "hqckem_wrapper"
+path = "src/bin/hqckem_wrapper.rs"
 
 [dev-dependencies]
 assert_cmd = "2.0"

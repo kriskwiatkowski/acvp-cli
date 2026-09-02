@@ -12,8 +12,10 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
+mod hqckem;
 mod mlkem;
 mod primitives;
+use hqckem::process_hqckem;
 use mlkem::process_mlkem;
 use primitives::*;
 
@@ -133,6 +135,7 @@ impl Subprocess {
             "ECDSA" => process_ecdsa(self, vector_set),
             "ML-DSA" => process_mldsa(self, vector_set),
             "ML-KEM" => process_mlkem(self, vector_set),
+            "HQC" => process_hqckem(self, vector_set),
             "SLH-DSA" => process_slhdsa(self, vector_set),
             "LMS" => process_lms(self, vector_set),
             "XMSS" => process_xmss(self, vector_set),
