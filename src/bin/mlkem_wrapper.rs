@@ -6,7 +6,7 @@
 //   Request:  [num_args][cmd_len][arg1_len]...[cmd_bytes][arg1_bytes]...
 //   Response: [num_results][res1_len]...[res1_bytes]...
 
-use mlkem_edu::{check_dk, check_ek, ml_kem_decaps, ml_kem_encaps, ml_kem_keygen, MLKEMParameters};
+use mlkem_ref::{check_dk, check_ek, ml_kem_decaps, ml_kem_encaps, ml_kem_keygen, MLKEMParameters};
 use std::io::{self, Read, Write};
 
 fn read_u32(r: &mut impl Read) -> io::Result<u32> {
@@ -51,8 +51,7 @@ fn params(name: &[u8]) -> Result<MLKEMParameters, String> {
 }
 
 fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
-    let cmd = std::str::from_utf8(args.first().ok_or("empty frame")?)
-        .map_err(|e| e.to_string())?;
+    let cmd = std::str::from_utf8(args.first().ok_or("empty frame")?).map_err(|e| e.to_string())?;
 
     match cmd {
         "getConfig" => Ok(vec![
