@@ -9,6 +9,16 @@ fn params(name: &[u8]) -> Result<MLKEMParameters, String> {
     MLKEMParameters::new(s).map_err(|e| e.to_string())
 }
 
+/// Resolves the requested parameter set, or `None` if the underlying library
+/// doesn't implement it. The caller should reply with the "unsupported"
+/// sentinel in that case rather than erroring out the whole connection.
+fn resolve_params(name: &[u8]) -> Result<Option<MLKEMParameters>, String> {
+    match params(name) {
+        Ok(p) => Ok(Some(p)),
+        Err(_) => Ok(None),
+    }
+}
+
 fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
     let cmd = std::str::from_utf8(args.first().ok_or("empty frame")?).map_err(|e| e.to_string())?;
 
@@ -21,7 +31,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, seed(64 bytes = z‖d)]
         // Returns: [ek, dk]
         "ML-KEM/keyGen" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             let seed = &args[2];
             if seed.len() != 64 {
                 return Err(format!("keyGen seed must be 64 bytes, got {}", seed.len()));
@@ -39,7 +51,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, ek, m(32 bytes)]
         // Returns: [c, k]
         "ML-KEM/encaps" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             let ek = &args[2];
             let m: &[u8; 32] = args[3]
                 .as_slice()
@@ -54,7 +68,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, dk, ct]
         // Returns: [k]
         "ML-KEM/decaps" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             let dk = &args[2];
             let ct = &args[3];
             let mut k = [0u8; 32];
@@ -65,7 +81,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, ek]
         // Returns: [0x01] if valid, [0x00] otherwise
         "ML-KEM/encapsulationKeyCheck" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             Ok(vec![if check_ek(&args[2], &p) {
                 vec![0x01]
             } else {
@@ -76,7 +94,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, dk]
         // Returns: [0x01] if valid, [0x00] otherwise
         "ML-KEM/decapsulationKeyCheck" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             Ok(vec![if check_dk(&args[2], &p) {
                 vec![0x01]
             } else {

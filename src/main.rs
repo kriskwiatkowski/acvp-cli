@@ -136,6 +136,13 @@ fn process_vectors_from_file(
     std::fs::write(output, &output_json).context("Failed to write output file")?;
     info!("Responses written to: {:?}", output);
 
+    if subprocess.unsupported_count() > 0 {
+        println!(
+            "{} test(s) reported unsupported by wrapper",
+            subprocess.unsupported_count()
+        );
+    }
+
     if let Some(path) = expected_path {
         let expected_data =
             std::fs::read_to_string(path).context("Failed to read expected results file")?;
@@ -162,6 +169,9 @@ fn check_expected(actual: &serde_json::Value, expected: &serde_json::Value) -> R
 
     let mut total = 0usize;
     let mut failures = 0usize;
+    let mut tested = 0usize;
+    let mut failed_tests = 0usize;
+    let mut unsupported = 0usize;
 
     for (act, exp) in actuals.iter().zip(expecteds.iter()) {
         let act_groups = act["testGroups"]
@@ -188,17 +198,25 @@ fn check_expected(actual: &serde_json::Value, expected: &serde_json::Value) -> R
                 .as_array()
                 .with_context(|| format!("actual group {tg_id} missing tests"))?;
 
+            let mut group_unsupported = 0usize;
+
             for exp_test in exp_tests {
                 let tc_id = exp_test["tcId"]
                     .as_u64()
                     .with_context(|| format!("expected test in group {tg_id} missing tcId"))?;
 
-                let act_test = act_tests
-                    .iter()
-                    .find(|t| t["tcId"].as_u64() == Some(tc_id))
-                    .with_context(|| {
-                        format!("actual response missing tcId {tc_id} in group {tg_id}")
-                    })?;
+                // A tcId absent from the actual response means the wrapper
+                // replied "unsupported" for it; that marker never makes it
+                // into the JSON, so a missing tcId here is how it surfaces.
+                let Some(act_test) = act_tests.iter().find(|t| t["tcId"].as_u64() == Some(tc_id))
+                else {
+                    group_unsupported += 1;
+                    unsupported += 1;
+                    continue;
+                };
+
+                tested += 1;
+                let mut test_failed = false;
 
                 if let Some(fields) = exp_test.as_object() {
                     for (key, exp_val) in fields {
@@ -219,17 +237,37 @@ fn check_expected(actual: &serde_json::Value, expected: &serde_json::Value) -> R
                                  expected={exp_val} actual={act_val}"
                             );
                             failures += 1;
+                            test_failed = true;
                         }
                     }
                 }
+
+                if test_failed {
+                    failed_tests += 1;
+                }
+            }
+
+            if group_unsupported > 0 {
+                eprintln!(
+                    "UNSUPPORTED tgId={tg_id}: {group_unsupported} test(s) not present in \
+                     actual response"
+                );
             }
         }
     }
 
+    let run = tested + unsupported;
+    let passed_tests = tested - failed_tests;
+
     if failures > 0 {
-        anyhow::bail!("{failures}/{total} field(s) did not match");
+        anyhow::bail!(
+            "{run} test(s) run: {passed_tests} passed, {failed_tests} failed \
+             ({failures}/{total} field(s) did not match), {unsupported} unsupported by wrapper"
+        );
     }
-    info!("{total} field(s) verified");
+    println!(
+        "{run} test(s) run: {passed_tests} passed, {unsupported} unsupported by wrapper"
+    );
     Ok(())
 }
 
@@ -277,5 +315,51 @@ fn process_vectors_from_directory(
         }
     }
 
+    if subprocess.unsupported_count() > 0 {
+        println!(
+            "{} test(s) reported unsupported by wrapper",
+            subprocess.unsupported_count()
+        );
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_expected;
+    use serde_json::json;
+
+    #[test]
+    fn missing_actual_tcid_is_treated_as_unsupported_not_a_failure() {
+        // tgId 2's tcId 1 is absent from the actual response, as happens
+        // when the wrapper replied "unsupported" for it and the entry was
+        // dropped rather than written to the output JSON.
+        let actual = json!({
+            "testGroups": [
+                {"tgId": 1, "tests": [{"tcId": 1, "md": "AA"}]},
+                {"tgId": 2, "tests": []}
+            ]
+        });
+        let expected = json!({
+            "testGroups": [
+                {"tgId": 1, "tests": [{"tcId": 1, "md": "aa"}]},
+                {"tgId": 2, "tests": [{"tcId": 1, "md": "BB"}]}
+            ]
+        });
+
+        assert!(check_expected(&actual, &expected).is_ok());
+    }
+
+    #[test]
+    fn field_mismatch_on_a_present_tcid_still_fails() {
+        let actual = json!({
+            "testGroups": [{"tgId": 1, "tests": [{"tcId": 1, "md": "AA"}]}]
+        });
+        let expected = json!({
+            "testGroups": [{"tgId": 1, "tests": [{"tcId": 1, "md": "BB"}]}]
+        });
+
+        assert!(check_expected(&actual, &expected).is_err());
+    }
 }

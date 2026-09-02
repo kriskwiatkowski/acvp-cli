@@ -40,6 +40,12 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
 
                     let results =
                         subprocess.transact("ML-KEM/keyGen", &[param_set.as_bytes(), &seed])?;
+                    if subprocess.check_unsupported(
+                        &results,
+                        &format!("ML-KEM/keyGen for parameterSet={param_set}"),
+                    ) {
+                        continue;
+                    }
 
                     json!({
                         "tcId": test_id,
@@ -60,6 +66,12 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
 
                             let results = subprocess
                                 .transact("ML-KEM/encaps", &[param_set.as_bytes(), &ek, &m])?;
+                            if subprocess.check_unsupported(
+                                &results,
+                                &format!("ML-KEM/encaps for parameterSet={param_set}"),
+                            ) {
+                                continue;
+                            }
 
                             json!({
                                 "tcId": test_id,
@@ -77,6 +89,12 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
 
                             let results = subprocess
                                 .transact("ML-KEM/decaps", &[param_set.as_bytes(), &dk, &ct])?;
+                            if subprocess.check_unsupported(
+                                &results,
+                                &format!("ML-KEM/decaps for parameterSet={param_set}"),
+                            ) {
+                                continue;
+                            }
 
                             json!({
                                 "tcId": test_id,
@@ -92,6 +110,14 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
                                 "ML-KEM/encapsulationKeyCheck",
                                 &[param_set.as_bytes(), &ek],
                             )?;
+                            if subprocess.check_unsupported(
+                                &results,
+                                &format!(
+                                    "ML-KEM/encapsulationKeyCheck for parameterSet={param_set}"
+                                ),
+                            ) {
+                                continue;
+                            }
 
                             json!({
                                 "tcId": test_id,
@@ -107,6 +133,14 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
                                 "ML-KEM/decapsulationKeyCheck",
                                 &[param_set.as_bytes(), &dk],
                             )?;
+                            if subprocess.check_unsupported(
+                                &results,
+                                &format!(
+                                    "ML-KEM/decapsulationKeyCheck for parameterSet={param_set}"
+                                ),
+                            ) {
+                                continue;
+                            }
 
                             json!({
                                 "tcId": test_id,

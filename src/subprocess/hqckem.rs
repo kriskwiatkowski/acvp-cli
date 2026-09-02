@@ -36,6 +36,12 @@ pub fn process_hqckem(subprocess: &mut Subprocess, vector_set: &Value) -> Result
 
                     let results =
                         subprocess.transact("HQC-KEM/keyGen", &[param_set.as_bytes(), &seed])?;
+                    if subprocess.check_unsupported(
+                        &results,
+                        &format!("HQC-KEM/keyGen for parameterSet={param_set}"),
+                    ) {
+                        continue;
+                    }
 
                     json!({
                         "tcId": test_id,
@@ -54,6 +60,12 @@ pub fn process_hqckem(subprocess: &mut Subprocess, vector_set: &Value) -> Result
 
                             let results = subprocess
                                 .transact("HQC-KEM/encaps", &[param_set.as_bytes(), &ek, &m])?;
+                            if subprocess.check_unsupported(
+                                &results,
+                                &format!("HQC-KEM/encaps for parameterSet={param_set}"),
+                            ) {
+                                continue;
+                            }
 
                             json!({
                                 "tcId": test_id,
@@ -69,6 +81,12 @@ pub fn process_hqckem(subprocess: &mut Subprocess, vector_set: &Value) -> Result
 
                             let results = subprocess
                                 .transact("HQC-KEM/decaps", &[param_set.as_bytes(), &dk, &ct])?;
+                            if subprocess.check_unsupported(
+                                &results,
+                                &format!("HQC-KEM/decaps for parameterSet={param_set}"),
+                            ) {
+                                continue;
+                            }
 
                             json!({
                                 "tcId": test_id,
@@ -383,6 +401,32 @@ mod tests {
             }]
         });
         assert!(process_hqckem(&mut start_wrapper(), &vs).is_err());
+    }
+
+    #[test]
+    fn unimplemented_parameter_set_is_reported_unsupported_not_fatal() {
+        // hqckem-ref only implements HQC-128/192/256; any other name falls
+        // through to its `todo!()` arm and panics. The wrapper must catch
+        // that and reply "unsupported" instead of taking down the whole
+        // connection, so processing can continue with the next test case.
+        let vs = json!({
+            "vsId": 30,
+            "algorithm": "HQC",
+            "mode": "keyGen",
+            "revision": "FIPS207",
+            "testGroups": [{
+                "tgId": 1,
+                "parameterSet": "HQC-does-not-exist",
+                "tests": [{"tcId": 1, "seed": "00"}]
+            }]
+        });
+        let mut subprocess = start_wrapper();
+        let result = process_hqckem(&mut subprocess, &vs).unwrap();
+        assert!(result["testGroups"][0]["tests"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(subprocess.unsupported_count(), 1);
     }
 
     #[test]

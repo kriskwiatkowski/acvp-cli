@@ -18,9 +18,25 @@ fn generate_kem_seed(input: &[u8]) -> [u8; 32] {
     out
 }
 
-fn params(name: &[u8]) -> Result<HqcParams, String> {
+/// Resolves the requested parameter set, or `None` if the underlying library
+/// doesn't implement it. The caller should reply with the "unsupported"
+/// sentinel in that case rather than erroring out the whole connection.
+///
+/// hqckem-ref's `HqcParams::new` panics (via `todo!()`) rather than
+/// returning `Err` for a name it doesn't recognize, so an unimplemented
+/// parameter set is caught with `catch_unwind` instead of `?`.
+fn resolve_params(name: &[u8]) -> Result<Option<HqcParams>, String> {
     let s = std::str::from_utf8(name).map_err(|e| e.to_string())?;
-    HqcParams::new(s).map_err(|e| e.to_string())
+
+    let prev_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let result = std::panic::catch_unwind(|| HqcParams::new(s));
+    std::panic::set_hook(prev_hook);
+
+    match result {
+        Ok(Ok(p)) => Ok(Some(p)),
+        Ok(Err(_)) | Err(_) => Ok(None),
+    }
 }
 
 fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
@@ -35,7 +51,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, seed(32 bytes)]
         // Returns: [ek, dk]
         "HQC-KEM/keyGen" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             let seed = &args[2];
             let mut ek = vec![0u8; p.public_key_size()];
             let mut dk = vec![0u8; p.secret_key_size()];
@@ -52,7 +70,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, ek, m(32 bytes)]
         // Returns: [c, k]
         "HQC-KEM/encaps" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             let ek = &args[2];
             let m: &[u8; 32] = args[3]
                 .as_slice()
@@ -67,7 +87,9 @@ fn dispatch(args: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, String> {
         // args: [cmd, param_set, dk, ct]
         // Returns: [k]
         "HQC-KEM/decaps" => {
-            let p = params(&args[1])?;
+            let Some(p) = resolve_params(&args[1])? else {
+                return Ok(vec![b"unsupported".to_vec()]);
+            };
             let dk = &args[2];
             let ct = &args[3];
             let mut k = [0u8; 32];

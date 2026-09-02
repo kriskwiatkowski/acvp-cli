@@ -19,10 +19,19 @@ use hqckem::process_hqckem;
 use mlkem::process_mlkem;
 use primitives::*;
 
+/// Sentinel a wrapper binary returns as its sole result to signal that it
+/// cannot perform the requested operation (e.g. an unimplemented parameter
+/// set), rather than crashing the read-dispatch-write loop with an error.
+const UNSUPPORTED: &[u8] = b"unsupported";
+
 pub struct Subprocess {
     process: Child,
     stdin: ChildStdin,
     stdout: ChildStdout,
+    unsupported_count: usize,
+    // Contexts already reported via `check_unsupported`, so a parameter set
+    // that's unsupported across e.g. 100 test cases logs once, not 100 times.
+    reported_unsupported: std::collections::HashSet<String>,
 }
 
 impl Subprocess {
@@ -48,7 +57,28 @@ impl Subprocess {
             process,
             stdin,
             stdout,
+            unsupported_count: 0,
+            reported_unsupported: std::collections::HashSet::new(),
         })
+    }
+
+    /// Checks whether `results` is a wrapper's "unsupported" response and, if
+    /// so, counts it toward `unsupported_count`, logging `context` only the
+    /// first time it's seen (a parameter set is typically unsupported across
+    /// every test case that uses it, so this avoids one line per test case).
+    pub fn check_unsupported(&mut self, results: &[Vec<u8>], context: &str) -> bool {
+        let unsupported = results.len() == 1 && results[0] == UNSUPPORTED;
+        if unsupported {
+            self.unsupported_count += 1;
+            if self.reported_unsupported.insert(context.to_string()) {
+                eprintln!("UNSUPPORTED: wrapper does not support {context}");
+            }
+        }
+        unsupported
+    }
+
+    pub fn unsupported_count(&self) -> usize {
+        self.unsupported_count
     }
 
     pub fn transact(&mut self, cmd: &str, args: &[&[u8]]) -> Result<Vec<Vec<u8>>> {
