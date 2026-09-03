@@ -263,8 +263,14 @@ mod tests {
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0]["tgId"], 1);
         assert_eq!(groups[1]["tgId"], 2);
-        assert_eq!(groups[0]["tests"][0]["k"].as_str().unwrap().to_uppercase(), K_128);
-        assert_eq!(groups[1]["tests"][0]["k"].as_str().unwrap().to_uppercase(), K_192);
+        assert_eq!(
+            groups[0]["tests"][0]["k"].as_str().unwrap().to_uppercase(),
+            K_128
+        );
+        assert_eq!(
+            groups[1]["tests"][0]["k"].as_str().unwrap().to_uppercase(),
+            K_192
+        );
     }
 
     #[test]

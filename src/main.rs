@@ -265,9 +265,7 @@ fn check_expected(actual: &serde_json::Value, expected: &serde_json::Value) -> R
              ({failures}/{total} field(s) did not match), {unsupported} unsupported by wrapper"
         );
     }
-    println!(
-        "{run} test(s) run: {passed_tests} passed, {unsupported} unsupported by wrapper"
-    );
+    println!("{run} test(s) run: {passed_tests} passed, {unsupported} unsupported by wrapper");
     Ok(())
 }
 

@@ -57,12 +57,10 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
                     let function = group["function"].as_str().context("Missing function")?;
                     match function {
                         "encapsulation" => {
-                            let ek =
-                                hex::decode(test["ek"].as_str().context("Missing ek")?)
-                                    .context("Invalid hex in ek")?;
-                            let m =
-                                hex::decode(test["m"].as_str().context("Missing m")?)
-                                    .context("Invalid hex in m")?;
+                            let ek = hex::decode(test["ek"].as_str().context("Missing ek")?)
+                                .context("Invalid hex in ek")?;
+                            let m = hex::decode(test["m"].as_str().context("Missing m")?)
+                                .context("Invalid hex in m")?;
 
                             let results = subprocess
                                 .transact("ML-KEM/encaps", &[param_set.as_bytes(), &ek, &m])?;
@@ -80,12 +78,10 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
                             })
                         }
                         "decapsulation" => {
-                            let dk =
-                                hex::decode(test["dk"].as_str().context("Missing dk")?)
-                                    .context("Invalid hex in dk")?;
-                            let ct =
-                                hex::decode(test["c"].as_str().context("Missing c")?)
-                                    .context("Invalid hex in c")?;
+                            let dk = hex::decode(test["dk"].as_str().context("Missing dk")?)
+                                .context("Invalid hex in dk")?;
+                            let ct = hex::decode(test["c"].as_str().context("Missing c")?)
+                                .context("Invalid hex in c")?;
 
                             let results = subprocess
                                 .transact("ML-KEM/decaps", &[param_set.as_bytes(), &dk, &ct])?;
@@ -102,9 +98,8 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
                             })
                         }
                         "encapsulationKeyCheck" => {
-                            let ek =
-                                hex::decode(test["ek"].as_str().context("Missing ek")?)
-                                    .context("Invalid hex in ek")?;
+                            let ek = hex::decode(test["ek"].as_str().context("Missing ek")?)
+                                .context("Invalid hex in ek")?;
 
                             let results = subprocess.transact(
                                 "ML-KEM/encapsulationKeyCheck",
@@ -125,9 +120,8 @@ pub fn process_mlkem(subprocess: &mut Subprocess, vector_set: &Value) -> Result<
                             })
                         }
                         "decapsulationKeyCheck" => {
-                            let dk =
-                                hex::decode(test["dk"].as_str().context("Missing dk")?)
-                                    .context("Invalid hex in dk")?;
+                            let dk = hex::decode(test["dk"].as_str().context("Missing dk")?)
+                                .context("Invalid hex in dk")?;
 
                             let results = subprocess.transact(
                                 "ML-KEM/decapsulationKeyCheck",
